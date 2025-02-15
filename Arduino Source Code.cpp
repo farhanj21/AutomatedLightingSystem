@@ -1,54 +1,56 @@
-// Pin Assignments
-const int pirPin = 2;        // PIR sensor input
-const int ldrPin = A0;       // LDR sensor input (analog)
-const int ledPin = 9;        // LED output (PWM for brightness)
-const int switchPin = 3;     // Master On/Off switch
+const int pirPin = 2;      
+const int ldrPin = A0;     
+const int ledPin = 9;      
+const int switchPin = 3;   
 
-// Timing Variables
-unsigned long motionDetectedTime = 0;  
-const unsigned long timeout = 5 * 60 * 1000; // 5 minutes in milliseconds
+bool systemOn = true;
+unsigned long lastMotionTime = 0;  
 
-bool motionDetected = false;
+const unsigned long timeout = 5000;
+// const unsigned long timeout = 300000; 
+
 
 void setup() {
-    pinMode(pirPin, INPUT);
-    pinMode(ledPin, OUTPUT);
-    pinMode(switchPin, INPUT_PULLUP); // Slide switch as on/off control
-    Serial.begin(9600);
+  pinMode(pirPin, INPUT);
+  pinMode(ldrPin, INPUT);
+  pinMode(ledPin, OUTPUT);
+  pinMode(switchPin, INPUT_PULLUP);
+
+  Serial.begin(9600); 
 }
 
 void loop() {
-    int switchState = digitalRead(switchPin); 
-    if (switchState == LOW) { // System turned OFF
-        digitalWrite(ledPin, LOW);
-        return;
-    }
+ 
+  systemOn = digitalRead(switchPin) == HIGH; //current switch state
 
-    int motionState = digitalRead(pirPin);
-    int ldrValue = analogRead(ldrPin);
+  if (!systemOn) {
+    digitalWrite(ledPin, LOW);
+    Serial.println("System is Off. LED turned Off.");
+    return;
+  }
 
-    Serial.print("LDR: "); Serial.print(ldrValue);
-    Serial.print(" | PIR: "); Serial.println(motionState);
+  int motionDetected = digitalRead(pirPin);
+  int lightLevel = analogRead(ldrPin); 
 
-    if (motionState == HIGH) {  
-        motionDetected = true;
-        motionDetectedTime = millis(); // Reset timer
-    }
+  Serial.print("LDR Value: ");
+  Serial.print(lightLevel);
+  Serial.print(" and PIR: ");
+  Serial.println(motionDetected ? "Motion Detected" : "No Motion");
 
-    if (motionDetected) {
-        if (ldrValue < 200) { // If it's dark
-            int brightness = map(ldrValue, 0, 200, 255, 100); // Adjust brightness
-            analogWrite(ledPin, brightness);
-        } else {
-            digitalWrite(ledPin, LOW); // Enough ambient light, turn off LED
-        }
+  if (motionDetected) {
+    lastMotionTime = millis(); // Reset when motion is detected
+  }
 
-        // Check if 5 minutes have passed with no motion
-        if (millis() - motionDetectedTime > timeout) {
-            motionDetected = false;
-            digitalWrite(ledPin, LOW);
-        }
-    } else {
-        digitalWrite(ledPin, LOW);
-    }
+  // check if motion detected and dark
+  if ((millis() - lastMotionTime < timeout) && (lightLevel < 200)) {
+    int brightness = map(lightLevel, 0, 1023, 255, 0); 
+    analogWrite(ledPin, brightness);
+    Serial.print("LED On - Brightness: ");
+    Serial.println(brightness);
+  } else {
+    digitalWrite(ledPin, LOW); 
+    Serial.println("LED Off - No motion/Enough Light");
+  }
+
+  delay(500);
 }
